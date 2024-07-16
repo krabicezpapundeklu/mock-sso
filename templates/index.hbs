@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>MOCK-SSO</title>
+    <link rel="icon" href="/favicon.png" />
+    <link href="/app.css?{{> VERSION }}" rel="stylesheet" />
+    <meta name="description" content="MOCK-SSO" />
+    <meta name="viewport" content="width=device-width" />
+</head>
+
+<body>
+    <header>
+        <h1 class="text-center">MOCK-SSO</h1>
+    </header>
+    <div class="container">
+        <form method="post">
+            <div class="row">
+                <div class="col-2">
+                    <label class="form-label" for="environment">Environment</label>
+                    <input class="form-control" id="environment" type="text">
+                </div>
+                <div class="col-6">
+                    <label class="form-label" for="target">Target</label>
+                    <input class="form-control" id="target" name="target" required type="text"
+                        value="http://localhost:8080/combined-app/home/saml.hms">
+                </div>
+                <div class="col-2">
+                    <label class="form-label" for="user_id">User ID</label>
+                    <input class="form-control" id="user_id" name="user_id" required type="text" value="SYSDBA">
+                </div>
+                <div class="align-items-end col-2 d-flex">
+                    <button class="btn btn-primary" type="submit">Login</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <script src="/app.js?{{> VERSION }}"></script>
+</body>
+
+</html>

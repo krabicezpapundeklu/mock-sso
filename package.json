@@ -1,0 +1,21 @@
+{
+    "name": "mock-sso",
+    "version": "0.0.1",
+    "scripts": {
+        "start": "webpack --config webpack.dev.js --progress --watch",
+        "build": "webpack --config webpack.prod.js"
+    },
+    "devDependencies": {
+        "css-loader": "6",
+        "mini-css-extract-plugin": "2",
+        "purgecss-webpack-plugin": "5",
+        "sass": "1",
+        "sass-loader": "14",
+        "webpack": "5",
+        "webpack-cli": "5",
+        "webpack-merge": "5"
+    },
+    "dependencies": {
+        "bootstrap": "5"
+    }
+}

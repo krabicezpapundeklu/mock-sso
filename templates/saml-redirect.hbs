@@ -1,0 +1,18 @@
+<html>
+
+<head>
+    <title>Access rights validated</title>
+</head>
+
+<body onload="document.forms[0].submit()">
+    <form method="post" action="{{ target }}">
+        <input type="hidden" name="SAMLResponse" value="{{ samlResponse }}" />
+        <input type="hidden" name="RelayState" value="/{{ relayState }}" />
+
+        <noscript>
+            <input type="submit" value="Click to Submit SAMLResponse data " />
+        </noscript>
+    </form>
+</body>
+
+</html>

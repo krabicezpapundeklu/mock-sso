@@ -1,0 +1,40 @@
+<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+    ID="" Version="2.0">
+    <samlp:Status xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol">
+        <samlp:StatusCode xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+            Value="urn:oasis:names:tc:SAML:2.0:status:Success" />
+    </samlp:Status>
+    <saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="" IssueInstant="{{ timestamp }}"
+        Version="2.0">
+        <saml:Issuer>{{ issuerUrl }}</saml:Issuer>
+        <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+            <ds:SignedInfo>
+                <ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" />
+                <ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha512" />
+                <ds:Reference URI="">
+                    <ds:Transforms>
+                        <ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" />
+                        <ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" />
+                    </ds:Transforms>
+                    <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha512" />
+                    <ds:DigestValue></ds:DigestValue>
+                </ds:Reference>
+            </ds:SignedInfo>
+            <ds:SignatureValue></ds:SignatureValue>
+            <ds:KeyInfo>
+                <ds:KeyValue></ds:KeyValue>
+            </ds:KeyInfo>
+        </ds:Signature>
+        <saml:Subject>
+            <saml:NameID>{{ SAMLNameId }}</saml:NameID>
+        </saml:Subject>
+        <saml:AudienceRestriction>
+            <saml:Audience>{{ issuerUrl }}</saml:Audience>
+        </saml:AudienceRestriction>
+        <saml:AttributeStatement>
+            <saml:Attribute Name="NameID">
+                <saml:AttributeValue>{{ SAMLNameId }}</saml:AttributeValue>
+            </saml:Attribute>
+        </saml:AttributeStatement>
+    </saml:Assertion>
+</samlp:Response>
