@@ -228,18 +228,29 @@ async fn submit(
         }
     }
 
+    let target_url = Url::parse(target);
+
+    let relay_state = if let Ok(target_url) = &target_url {
+        target_url
+            .path_segments()
+            .map_or("", |mut segments| segments.next().unwrap_or_default())
+    } else {
+        errors.push(if form.use_environment {
+            "'Environment' has invalid format."
+        } else {
+            "'Custom Target' has invalid format."
+        });
+
+        ""
+    };
+
     let user_id = form.user_id.trim();
 
     if user_id.is_empty() {
         errors.push("'User ID' is required field.");
     }
 
-    let target_url;
-
-    let mut serialized_saml_response = None;
-    let mut relay_state = "";
-
-    if errors.is_empty() {
+    let saml_response = if errors.is_empty() {
         let saml_response = app_context.handlebars.render(
             "saml-response",
             &json!({
@@ -251,18 +262,15 @@ async fn submit(
 
         let signed_saml_response = sign(saml_response.as_bytes(), &app_context.key).await?;
 
-        serialized_saml_response = Some(BASE64_STANDARD.encode(signed_saml_response));
-        target_url = Url::parse(target)?;
-
-        relay_state = target_url
-            .path_segments()
-            .map_or("", |mut segments| segments.next().unwrap_or_default());
-    }
+        Some(BASE64_STANDARD.encode(signed_saml_response))
+    } else {
+        None
+    };
 
     let data = IndexOutputData {
         input_data: &form,
         target,
-        saml_response: serialized_saml_response.as_deref().unwrap_or_default(),
+        saml_response: saml_response.as_deref().unwrap_or_default(),
         relay_state,
         errors: &errors,
     };
