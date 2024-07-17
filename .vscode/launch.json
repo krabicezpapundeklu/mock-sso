@@ -1,0 +1,26 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'mock-sso'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=mock-sso",
+                    "--package=mock-sso"
+                ],
+                "filter": {
+                    "name": "mock-sso",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "--port",
+                "8081"
+            ],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

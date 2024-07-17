@@ -1,15 +1,25 @@
-import './app.scss';
+import './app.scss'
 
 const environmentElement = document.getElementById('environment');
-const targetElement = document.getElementById('target');
+const customTargetElement = document.getElementById('custom_target');
+const useEnvironmentElement = document.getElementById('use_environment');
+const useCustomTargetElement = document.getElementById('use_custom_target');
 
-const fillTarget = () => {
-    const environment = environmentElement.value.trim();
-
-    targetElement.value = environment
-        ? `https://${environment}-ats.mgspdtesting.com/${environment}/home/saml.hms`
-        : 'http://localhost:8080/combined-app/home/saml.hms';
+const useEnvironment = (use) => {
+    if (use) {
+        environmentElement.disabled = false;
+        useEnvironmentElement.checked = true;
+        customTargetElement.disabled = true;
+    } else {
+        customTargetElement.disabled = false;
+        useCustomTargetElement.checked = true;
+        environmentElement.disabled = true;
+    }
 }
 
-environmentElement.addEventListener('change', fillTarget);
-environmentElement.addEventListener('keyup', fillTarget);
+useEnvironmentElement.addEventListener('click', () => useEnvironment(true));
+useCustomTargetElement.addEventListener('click', () => useEnvironment(false));
+
+window.addEventListener("pageshow", () => {
+    useEnvironment(useEnvironmentElement.checked);
+});

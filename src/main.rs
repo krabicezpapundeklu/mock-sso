@@ -1,4 +1,4 @@
-use std::path::{absolute, PathBuf};
+use std::ffi::OsString;
 
 use anyhow::Result;
 use clap::Parser;
@@ -15,21 +15,12 @@ struct Args {
     port: u16,
 
     #[arg(default_value = "key.pem", long)]
-    key: PathBuf,
-
-    #[arg(default_value = "cert.pem", long)]
-    cert: PathBuf,
+    key: OsString,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
 
-    server::start(
-        &args.host,
-        args.port,
-        absolute(args.key)?.into_os_string(),
-        absolute(args.cert)?.into_os_string(),
-    )
-    .await
+    server::start(&args.host, args.port, args.key).await
 }

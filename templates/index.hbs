@@ -11,29 +11,56 @@
 </head>
 
 <body>
-    <header>
-        <h1 class="text-center">MOCK-SSO</h1>
-    </header>
     <div class="container">
+        <header>
+            <h1 class="mb-4 text-center">
+                <a href="https://github.com/krabicezpapundeklu/mock-sso"
+                    title="MOCK-SSO, version: {{> VERSION }}">MOCK-SSO</a>
+            </h1>
+        </header>
+        {{#if errors}}
+        <div class="alert alert-danger" role="alert">
+            <ul class="mb-0">
+                {{#each errors}}
+                <li>{{ this }}</li>
+                {{/each}}
+            </ul>
+        </div>
+        {{/if}}
         <form method="post">
-            <div class="row">
-                <div class="col-2">
-                    <label class="form-label" for="environment">Environment</label>
-                    <input class="form-control" id="environment" type="text">
+            <div class="d-flex gap-3">
+                <div>
+                    <div class="form-check mb-2">
+                        <input {{#if use_environment}}checked{{/if}} class="form-check-input" id="use_environment"
+                            name="use_environment" type="radio" value="true">
+                        <label class="form-check-label" for="use_environment">
+                            Environment
+                        </label>
+                    </div>
+                    <input aria-label="Environment" class="form-control" id="environment" name="environment" type="text"
+                        value="{{ environment }}">
                 </div>
-                <div class="col-6">
-                    <label class="form-label" for="target">Target</label>
-                    <input class="form-control" id="target" name="target" required type="text"
-                        value="http://localhost:8080/combined-app/home/saml.hms">
+                <div class="flex-fill">
+                    <div class="form-check mb-2">
+                        <input {{#unless use_environment}}checked{{/unless}} class="form-check-input"
+                            id="use_custom_target" name="use_environment" type="radio" value="false">
+                        <label class="form-check-label" for="use_custom_target">
+                            Custom Target
+                        </label>
+                    </div>
+                    <input aria-label="Custom Target" class="form-control" id="custom_target" name="custom_target"
+                        type="text" value="{{ custom_target }}">
                 </div>
-                <div class="col-2">
+                <div>
                     <label class="form-label" for="user_id">User ID</label>
-                    <input class="form-control" id="user_id" name="user_id" required type="text" value="SYSDBA">
+                    <input class="form-control" id="user_id" name="user_id" type="text" value="{{ user_id }}">
                 </div>
-                <div class="align-items-end col-2 d-flex">
+                <div class="align-items-end d-flex">
                     <button class="btn btn-primary" type="submit">Login</button>
                 </div>
             </div>
+            <div class="mt-4 text-center">To register MOCK-SSO with the environment run <a href="./script.sql">this</a>
+                script.</div>
         </form>
     </div>
     <script src="/app.js?{{> VERSION }}"></script>
