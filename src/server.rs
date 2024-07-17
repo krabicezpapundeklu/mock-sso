@@ -235,11 +235,13 @@ async fn submit(
             .path_segments()
             .map_or("", |mut segments| segments.next().unwrap_or_default())
     } else {
-        errors.push(if form.use_environment {
-            "'Environment' has invalid format."
-        } else {
-            "'Custom Target' has invalid format."
-        });
+        if !target.is_empty() {
+            errors.push(if form.use_environment {
+                "'Environment' has invalid format."
+            } else {
+                "'Custom Target' has invalid format."
+            });
+        }
 
         ""
     };
