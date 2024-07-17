@@ -73,7 +73,7 @@ impl IntoResponse for AppError {
 }
 
 #[derive(Deserialize, Serialize)]
-struct IndexData {
+struct IndexInputData {
     #[serde(default)]
     environment: String,
 
@@ -85,9 +85,18 @@ struct IndexData {
 
     #[serde(default = "default_use_environment")]
     use_environment: bool,
+}
 
-    #[serde(default)]
-    errors: Vec<String>,
+#[derive(Serialize)]
+struct IndexOutputData<'a> {
+    #[serde(flatten)]
+    input_data: &'a IndexInputData,
+
+    target: &'a str,
+    saml_response: &'a str,
+    relay_state: &'a str,
+
+    errors: &'a Vec<&'a str>,
 }
 
 fn default_custom_target() -> String {
@@ -134,7 +143,7 @@ async fn get_asset(uri: Uri) -> Response {
 
 async fn get_index(
     State(app_context): State<AppContext>,
-    Query(query): Query<IndexData>,
+    Query(query): Query<IndexInputData>,
 ) -> Result<Html<String>, AppError> {
     app_context
         .handlebars
@@ -192,8 +201,10 @@ pub async fn start(host: &str, port: u16, key: OsString) -> Result<()> {
 
 async fn submit(
     State(app_context): State<AppContext>,
-    Form(mut form): Form<IndexData>,
+    Form(form): Form<IndexInputData>,
 ) -> Result<Html<String>, AppError> {
+    let mut errors = Vec::new();
+
     let target;
     let environment_target;
 
@@ -202,9 +213,7 @@ async fn submit(
 
         if environment.is_empty() {
             target = "";
-
-            form.errors
-                .push("'Environment' is required field.".to_string());
+            errors.push("'Environment' is required field.");
         } else {
             environment_target =
                 format!("https://{environment}-ats.mgspdtesting.com/{environment}/home/saml.hms");
@@ -215,47 +224,52 @@ async fn submit(
         target = form.custom_target.trim();
 
         if target.is_empty() {
-            form.errors
-                .push("'Custom Target' is required field.".to_string());
+            errors.push("'Custom Target' is required field.");
         }
     }
 
     let user_id = form.user_id.trim();
 
     if user_id.is_empty() {
-        form.errors.push("'User ID' is required field.".to_string());
+        errors.push("'User ID' is required field.");
     }
 
-    if !form.errors.is_empty() {
-        return Ok(Html(app_context.handlebars.render("index", &form)?));
+    let target_url;
+
+    let mut serialized_saml_response = None;
+    let mut relay_state = "";
+
+    if errors.is_empty() {
+        let saml_response = app_context.handlebars.render(
+            "saml-response",
+            &json!({
+                "issuer_url": ISSUER_URL,
+                "timestamp": Utc::now().to_rfc3339(),
+                "user_id": user_id,
+            }),
+        )?;
+
+        let signed_saml_response = sign(saml_response.as_bytes(), &app_context.key).await?;
+
+        serialized_saml_response = Some(BASE64_STANDARD.encode(signed_saml_response));
+        target_url = Url::parse(target)?;
+
+        relay_state = target_url
+            .path_segments()
+            .map_or("", |mut segments| segments.next().unwrap_or_default());
     }
 
-    let saml_response = app_context.handlebars.render(
-        "saml-response",
-        &json!({
-            "issuer_url": ISSUER_URL,
-            "timestamp": Utc::now().to_rfc3339(),
-            "user_id": user_id,
-        }),
-    )?;
-
-    let signed_saml_response = sign(saml_response.as_bytes(), &app_context.key).await?;
-    let target_url = Url::parse(target)?;
-
-    let relay_state = target_url
-        .path_segments()
-        .map_or("", |mut segments| segments.next().unwrap_or_default());
+    let data = IndexOutputData {
+        input_data: &form,
+        target,
+        saml_response: serialized_saml_response.as_deref().unwrap_or_default(),
+        relay_state,
+        errors: &errors,
+    };
 
     app_context
         .handlebars
-        .render(
-            "saml-redirect",
-            &json!({
-                "relay_state": relay_state,
-                "saml_response": BASE64_STANDARD.encode(signed_saml_response),
-                "target": &target,
-            }),
-        )
+        .render("index", &data)
         .map(Html)
         .map_err(Into::into)
 }

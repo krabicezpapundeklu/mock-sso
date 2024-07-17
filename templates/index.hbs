@@ -18,6 +18,21 @@
                     title="MOCK-SSO, version: {{> VERSION }}">MOCK-SSO</a>
             </h1>
         </header>
+        {{#if saml_response}}
+        <form method="post" action="{{ target }}">
+            <input type="hidden" name="SAMLResponse" value="{{ saml_response }}" />
+            <input type="hidden" name="RelayState" value="/{{ relay_state }}" />
+
+            <div class="alert alert-success align-items-center d-flex" role="alert">
+                <span class="flex-fill">Redirecting...</span>
+                <button class="btn btn-link p-0" type="submit">Redirect now</button>
+            </div>
+
+            <script>
+                document.forms[0].submit();
+            </script>
+        </form>
+        {{/if}}
         {{#if errors}}
         <div class="alert alert-danger" role="alert">
             <ul class="mb-0">
