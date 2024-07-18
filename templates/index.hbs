@@ -27,14 +27,14 @@
             <input type="hidden" name="RelayState" value="/{{ relay_state }}" />
 
             <div class="alert alert-success" role="alert">
-                <span class="flex-fill visually-hidden" id="redirecting">Redirecting...</span>
+                <span class="flex-fill visually-hidden" id="logging_in">Logging in...</span>
                 <noscript>
-                    <button class="btn btn-link p-0" type="submit">Redirect now</button>
+                    Click <button class="btn btn-link p-0" type="submit">here</button> to log in.
                 </noscript>
             </div>
 
             <script>
-                document.getElementById('redirecting').classList.remove('visually-hidden');
+                document.getElementById('logging_in').classList.remove('visually-hidden');
 
                 window.onload = () => {
                     document.getElementById('redirect_form').submit()
@@ -87,7 +87,7 @@
                 </div>
             </div>
             <div class="mt-2 form-text">
-                For QA testing select 'Environment' and enter environment you want to log-in to ('qa-maint', for
+                For QA testing select 'Environment' and enter environment you want to log into ('qa-maint', for
                 example).
             </div>
             <div class="form-text">
