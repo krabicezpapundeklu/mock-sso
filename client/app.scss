@@ -38,3 +38,11 @@
 
 @import 'bootstrap/scss/helpers';
 @import 'bootstrap/scss/utilities/api';
+
+.inactive {
+    background-color: var(--bs-secondary-bg) !important;
+
+    &:focus {
+        box-shadow: 0 0 0 .25rem var(--bs-secondary-bg);
+    }
+}
