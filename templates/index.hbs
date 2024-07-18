@@ -54,7 +54,7 @@
                     <legend class="visually-hidden">Login Target</legend>
                     <div data-use-environment="true">
                         <div class="form-check mb-2">
-                            <label class="form-check-label">
+                            <label class="form-check-label" title="For QA testing">
                                 <input {{#if use_environment}}checked{{/if}} class="form-check-input"
                                     name="use_environment" type="radio" value="true">
                                 Environment
@@ -65,7 +65,7 @@
                     </div>
                     <div class="flex-fill" data-use-environment="false">
                         <div class="form-check mb-2">
-                            <label class="form-check-label">
+                            <label class="form-check-label" title="For local testing">
                                 <input {{#unless use_environment}}checked{{/unless}} class="form-check-input"
                                     name="use_environment" type="radio" value="false">
                                 Custom Target
@@ -82,6 +82,14 @@
                 <div class="align-items-end d-flex">
                     <button class="btn btn-primary" type="submit">Login</button>
                 </div>
+            </div>
+            <div class="mt-2 form-text">
+                For QA testing select 'Environment' and enter environment you want to log-in to ('qa-maint', for
+                example).
+            </div>
+            <div class="form-text">
+                For local testing select 'Custom Target' and enter whatever works for you. You know what you are doing
+                😉
             </div>
             <div class="mt-4 text-center">
                 To register MOCK-SSO with the environment run
