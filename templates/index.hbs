@@ -50,27 +50,27 @@
         {{/if}}
         <form id="submit_form" method="post">
             <div class="d-flex gap-3">
-                <div>
+                <div data-use-environment="true">
                     <div class="form-check mb-2">
-                        <input {{#if use_environment}}checked{{/if}} class="form-check-input" id="use_environment"
-                            name="use_environment" type="radio" value="true">
-                        <label class="form-check-label" for="use_environment">
+                        <label class="form-check-label">
+                            <input {{#if use_environment}}checked{{/if}} class="form-check-input" name="use_environment"
+                                type="radio" value="true">
                             Environment
                         </label>
                     </div>
-                    <input aria-label="Environment" class="form-control" id="environment" name="environment" type="text"
+                    <input aria-label="Environment" class="form-control" name="environment" type="text"
                         value="{{ environment }}">
                 </div>
-                <div class="flex-fill">
+                <div class="flex-fill" data-use-environment="false">
                     <div class="form-check mb-2">
-                        <input {{#unless use_environment}}checked{{/unless}} class="form-check-input"
-                            id="use_custom_target" name="use_environment" type="radio" value="false">
-                        <label class="form-check-label" for="use_custom_target">
+                        <label class="form-check-label">
+                            <input {{#unless use_environment}}checked{{/unless}} class="form-check-input"
+                                name="use_environment" type="radio" value="false">
                             Custom Target
                         </label>
                     </div>
-                    <input aria-label="Custom Target" class="form-control" id="custom_target" name="custom_target"
-                        type="text" value="{{ custom_target }}">
+                    <input aria-label="Custom Target" class="form-control" name="custom_target" type="text"
+                        value="{{ custom_target }}">
                 </div>
                 <div>
                     <label class="form-label" for="user_id">User ID</label>
@@ -80,8 +80,11 @@
                     <button class="btn btn-primary" type="submit">Login</button>
                 </div>
             </div>
-            <div class="mt-4 text-center">To register MOCK-SSO with the environment run <a href="./script.sql">this</a>
-                script.</div>
+            <div class="mt-4 text-center">
+                To register MOCK-SSO with the environment run
+                <a href="./script.sql">this</a>
+                script.
+            </div>
         </form>
     </div>
     <script src="/app.js?{{> VERSION }}"></script>

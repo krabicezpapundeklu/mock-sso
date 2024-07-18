@@ -1,32 +1,25 @@
 import './app.scss'
 
-const submitFormElement = document.getElementById('submit_form');
+// post values of all inputs, including disabled ones
+document.getElementById('submit_form').addEventListener('formdata', (e) => {
+    const formData = e.formData;
 
-const environmentElement = document.getElementById('environment');
-const customTargetElement = document.getElementById('custom_target');
-const useEnvironmentElement = document.getElementById('use_environment');
-const useCustomTargetElement = document.getElementById('use_custom_target');
-
-const useEnvironment = (use) => {
-    if (use) {
-        environmentElement.disabled = false;
-        useEnvironmentElement.checked = true;
-        customTargetElement.disabled = true;
-    } else {
-        customTargetElement.disabled = false;
-        useCustomTargetElement.checked = true;
-        environmentElement.disabled = true;
+    for (const input of document.querySelectorAll('input:not([type=radio]), input:checked')) {
+        formData.set(input.name, input.value);
     }
-}
-
-submitFormElement.addEventListener('formdata', (e) => {
-    e.formData.set('environment', environmentElement.value);
-    e.formData.set('custom_target', customTargetElement.value);
 });
 
-useEnvironmentElement.addEventListener('click', () => useEnvironment(true));
-useCustomTargetElement.addEventListener('click', () => useEnvironment(false));
+document.querySelectorAll('[data-use-environment]').forEach((e) => {
+    const radio = e.querySelector('input[type=radio]');
+    const inputToEnable = e.querySelector('input[type=text]');
+    const inputToDisable = document.querySelector(`[data-use-environment=${e.dataset.useEnvironment === 'true' ? 'false' : 'true'}] input[type=text]`);
 
-window.addEventListener("pageshow", () => {
-    useEnvironment(useEnvironmentElement.checked);
+    if (radio.checked) {
+        inputToDisable.disabled = true;
+    }
+
+    radio.addEventListener('click', () => {
+        inputToEnable.disabled = false;
+        inputToDisable.disabled = true;
+    });
 });
