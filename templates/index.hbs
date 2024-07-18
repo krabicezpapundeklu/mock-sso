@@ -11,13 +11,16 @@
 </head>
 
 <body>
-    <div class="container">
-        <header>
-            <h1 class="mb-4 text-center">
-                <a href="https://github.com/krabicezpapundeklu/mock-sso"
-                    title="MOCK-SSO, version: {{> VERSION }}">MOCK-SSO</a>
-            </h1>
-        </header>
+    <nav class="bg-body-tertiary navbar">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="https://github.com/krabicezpapundeklu/mock-sso"
+                title="MOCK-SSO, version: {{> VERSION }}">
+                <img class="align-text-center d-inline-block" alt="Logo" height="24" src="./favicon.png" width="24">
+                MOCK-SSO
+            </a>
+        </div>
+    </nav>
+    <div class="container mt-3">
         {{#if saml_response}}
         <form action="{{ target }}" id="redirect_form" method="post">
             <input type="hidden" name="SAMLResponse" value="{{ saml_response }}" />
@@ -89,12 +92,12 @@
             </div>
             <div class="form-text">
                 For local testing select 'Custom Target' and enter whatever works for you. You know what you are doing
-                😉
+                🫡
             </div>
-            <div class="mt-4 text-center">
-                To register MOCK-SSO with the environment run
+            <div class="alert alert-warning mt-4" role="alert">
+                To enable MOCK-SSO in QA/your environment you need to run
                 <a href="./script.sql">this</a>
-                script.
+                script (once).
             </div>
         </form>
     </div>
