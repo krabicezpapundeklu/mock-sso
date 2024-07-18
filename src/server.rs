@@ -9,9 +9,10 @@ use axum::{
     extract::{Query, State},
     http::{
         header::{CACHE_CONTROL, CONTENT_TYPE},
+        uri::PathAndQuery,
         StatusCode, Uri,
     },
-    response::{Html, IntoResponse, Response},
+    response::{Html, IntoResponse, Redirect, Response},
     routing::get,
     serve, Form, Router,
 };
@@ -123,7 +124,19 @@ async fn get_asset(uri: Uri) -> Response {
     #[folder = "static"]
     struct Static;
 
-    let path = uri.path().trim_start_matches('/');
+    let path = uri.path();
+
+    if !path.starts_with("/mock-sso/") {
+        return Redirect::permanent(&format!(
+            "/mock-sso{}",
+            uri.path_and_query()
+                .map(PathAndQuery::as_str)
+                .unwrap_or_default()
+        ))
+        .into_response();
+    }
+
+    let path = uri.path().trim_start_matches("/mock-sso/");
 
     if let Some(asset) = Dist::get(path) {
         (
@@ -189,7 +202,7 @@ pub async fn start(host: &str, port: u16, key: OsString) -> Result<()> {
     let app_context = AppContext::new(key)?;
 
     let router = Router::new()
-        .route("/", get(get_index).post(submit))
+        .route("/mock-sso/", get(get_index).post(submit))
         .fallback(get(get_asset))
         .with_state(app_context)
         .layer(ServiceBuilder::new().layer(CompressionLayer::new()));
