@@ -50,28 +50,31 @@
         {{/if}}
         <form id="submit_form" method="post">
             <div class="d-flex gap-3">
-                <div data-use-environment="true">
-                    <div class="form-check mb-2">
-                        <label class="form-check-label">
-                            <input {{#if use_environment}}checked{{/if}} class="form-check-input" name="use_environment"
-                                type="radio" value="true">
-                            Environment
-                        </label>
+                <fieldset class="d-flex flex-fill gap-3">
+                    <legend class="visually-hidden">Login Target</legend>
+                    <div data-use-environment="true">
+                        <div class="form-check mb-2">
+                            <label class="form-check-label">
+                                <input {{#if use_environment}}checked{{/if}} class="form-check-input"
+                                    name="use_environment" type="radio" value="true">
+                                Environment
+                            </label>
+                        </div>
+                        <input aria-label="Environment" class="form-control" name="environment" type="text"
+                            value="{{ environment }}">
                     </div>
-                    <input aria-label="Environment" class="form-control" name="environment" type="text"
-                        value="{{ environment }}">
-                </div>
-                <div class="flex-fill" data-use-environment="false">
-                    <div class="form-check mb-2">
-                        <label class="form-check-label">
-                            <input {{#unless use_environment}}checked{{/unless}} class="form-check-input"
-                                name="use_environment" type="radio" value="false">
-                            Custom Target
-                        </label>
+                    <div class="flex-fill" data-use-environment="false">
+                        <div class="form-check mb-2">
+                            <label class="form-check-label">
+                                <input {{#unless use_environment}}checked{{/unless}} class="form-check-input"
+                                    name="use_environment" type="radio" value="false">
+                                Custom Target
+                            </label>
+                        </div>
+                        <input aria-label="Custom Target" class="form-control" name="custom_target" type="text"
+                            value="{{ custom_target }}">
                     </div>
-                    <input aria-label="Custom Target" class="form-control" name="custom_target" type="text"
-                        value="{{ custom_target }}">
-                </div>
+                </fieldset>
                 <div>
                     <label class="form-label" for="user_id">User ID</label>
                     <input class="form-control" id="user_id" name="user_id" type="text" value="{{ user_id }}">
