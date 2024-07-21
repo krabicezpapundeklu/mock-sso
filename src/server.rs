@@ -17,8 +17,10 @@ use axum::{
     serve, Form, Router,
 };
 
+use axum_extra::extract::{cookie::Cookie, CookieJar};
 use base64::{prelude::BASE64_STANDARD, Engine};
 use chrono::Utc;
+use cookie::time::Duration;
 use handlebars::Handlebars;
 use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
@@ -75,41 +77,30 @@ impl IntoResponse for AppError {
 
 #[derive(Deserialize, Serialize)]
 struct IndexInputData {
-    #[serde(default)]
+    environment: Option<String>,
+    custom_target: Option<String>,
+    user_id: Option<String>,
+    use_environment: Option<bool>,
+}
+
+#[derive(Deserialize, Serialize)]
+struct IndexSubmitData {
     environment: String,
-
-    #[serde(default = "default_custom_target")]
     custom_target: String,
-
-    #[serde(default = "default_user_id")]
     user_id: String,
-
-    #[serde(default = "default_use_environment")]
     use_environment: bool,
 }
 
 #[derive(Serialize)]
 struct IndexOutputData<'a> {
     #[serde(flatten)]
-    input_data: &'a IndexInputData,
+    input_data: &'a IndexSubmitData,
 
     target: &'a str,
     saml_response: &'a str,
     relay_state: &'a str,
 
     errors: &'a Vec<&'a str>,
-}
-
-fn default_custom_target() -> String {
-    "http://localhost:8080/combined-app/home/saml.hms".to_string()
-}
-
-fn default_user_id() -> String {
-    "sysdba".to_string()
-}
-
-const fn default_use_environment() -> bool {
-    true
 }
 
 async fn get_asset(uri: Uri) -> Response {
@@ -157,10 +148,42 @@ async fn get_asset(uri: Uri) -> Response {
 async fn get_index(
     State(app_context): State<AppContext>,
     Query(query): Query<IndexInputData>,
+    jar: CookieJar,
 ) -> Result<Html<String>, AppError> {
+    let environment = query
+        .environment
+        .as_deref()
+        .unwrap_or_else(|| jar.get("environment").map_or("", |cookie| cookie.value()));
+
+    let custom_target = query.custom_target.as_deref().unwrap_or_else(|| {
+        jar.get("custom_target").map_or(
+            "http://localhost:8080/combined-app/home/saml.hms",
+            |cookie| cookie.value(),
+        )
+    });
+
+    let user_id = query
+        .user_id
+        .as_deref()
+        .unwrap_or_else(|| jar.get("user_id").map_or("sysdba", |cookie| cookie.value()));
+
+    let use_environment = query.use_environment.unwrap_or_else(|| {
+        jar.get("use_environment")
+            .map_or("true", |cookie| cookie.value())
+            == "true"
+    });
+
     app_context
         .handlebars
-        .render("index", &query)
+        .render(
+            "index",
+            &json!({
+                "environment": environment,
+                "custom_target": custom_target,
+                "user_id": user_id,
+                "use_environment": use_environment
+            }),
+        )
         .map(Html)
         .map_err(Into::into)
 }
@@ -214,8 +237,9 @@ pub async fn start(host: &str, port: u16, key: OsString) -> Result<()> {
 
 async fn submit(
     State(app_context): State<AppContext>,
-    Form(form): Form<IndexInputData>,
-) -> Result<Html<String>, AppError> {
+    jar: CookieJar,
+    Form(form): Form<IndexSubmitData>,
+) -> Result<impl IntoResponse, AppError> {
     let mut errors = Vec::new();
 
     let target;
@@ -290,9 +314,23 @@ async fn submit(
         errors: &errors,
     };
 
-    app_context
-        .handlebars
-        .render("index", &data)
-        .map(Html)
-        .map_err(Into::into)
+    let output = app_context.handlebars.render("index", &data).map(Html)?;
+
+    let jar = jar
+        .add(Cookie::build(("environment", form.environment)).max_age(Duration::MAX))
+        .add(Cookie::build(("custom_target", form.custom_target)).max_age(Duration::MAX))
+        .add(Cookie::build(("user_id", form.user_id)).max_age(Duration::MAX))
+        .add(
+            Cookie::build((
+                "use_environment",
+                if form.use_environment {
+                    "true".to_string()
+                } else {
+                    "false".to_string()
+                },
+            ))
+            .max_age(Duration::MAX),
+        );
+
+    Ok((jar, output))
 }

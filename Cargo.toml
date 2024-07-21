@@ -6,9 +6,11 @@ edition = "2021"
 [dependencies]
 anyhow = "1"
 axum = "0"
+axum-extra = { version = "0", features = ["cookie"] }
 base64 = "0"
 chrono = "0"
 clap = { version = "4", features = ["derive"] }
+cookie = "0"
 handlebars = { version = "5", features = ["rust-embed"] }
 rust-embed = { version = "8", features = ["mime-guess"] }
 serde = { version = "1", features = ["derive"] }
