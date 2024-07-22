@@ -1,3 +1,6 @@
+$purple: #58388c;
+$primary: $purple !default;
+
 @import 'bootstrap/scss/functions';
 @import 'bootstrap/scss/variables';
 @import 'bootstrap/scss/variables-dark';
@@ -39,10 +42,28 @@
 @import 'bootstrap/scss/helpers';
 @import 'bootstrap/scss/utilities/api';
 
-.inactive {
-    background-color: var(--bs-secondary-bg) !important;
+.alert-danger {
+  background-color: #f44336;
+  border: 0;
+  color: white;
+}
 
-    &:focus {
-        box-shadow: 0 0 0 .25rem var(--bs-secondary-bg);
-    }
+.alert-warning {
+  background-color: #ebc144;
+  border: 0;
+}
+
+.inactive {
+  background-color: var(--bs-secondary-bg) !important;
+
+  &:focus {
+    box-shadow: 0 0 0 .25rem var(--bs-secondary-bg);
+  }
+}
+
+.navbar {
+  --bs-navbar-brand-color: white;
+  --bs-navbar-brand-hover-color: white;
+  --bs-navbar-color: white;
+  background-color: $purple;
 }

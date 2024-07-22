@@ -11,13 +11,14 @@
 </head>
 
 <body>
-    <nav class="bg-body-tertiary navbar">
+    <nav class="navbar">
         <div class="container-fluid">
-            <a class="navbar-brand" href="https://github.com/krabicezpapundeklu/mock-sso"
-                title="MOCK-SSO, version: {{> VERSION }}">
-                <img class="align-text-center d-inline-block" alt="Logo" height="24" src="./favicon.png" width="24">
-                MOCK-SSO
+            <a class="navbar-brand" href="https://github.com/krabicezpapundeklu/mock-sso">
+                <img class="align-text-center d-inline-block" alt="MOCK-SSO Logo" height="24" src="./favicon.png"
+                    width="24">
+                <h1 class="fs-5 d-inline">MOCK-SSO</h1>
             </a>
+            <span class="navbar-text">{{> VERSION }}</span>
         </div>
     </nav>
     <div class="container mt-3">
@@ -96,7 +97,7 @@
             </div>
             <div class="alert alert-warning mt-4" role="alert">
                 To enable MOCK-SSO in QA/your environment you need to run
-                <a href="./script.sql">this</a>
+                <a class="alert-link" href="./script.sql">this</a>
                 script (once).
             </div>
         </form>
