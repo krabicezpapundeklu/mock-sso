@@ -14,7 +14,7 @@ use axum::{
     },
     response::{Html, IntoResponse, Redirect, Response},
     routing::get,
-    serve, Form, Router,
+    serve, Router,
 };
 
 use axum_extra::extract::{cookie::Cookie, CookieJar};
@@ -81,20 +81,13 @@ struct IndexInputData {
     custom_target: Option<String>,
     user_id: Option<String>,
     use_environment: Option<bool>,
-}
-
-#[derive(Deserialize, Serialize)]
-struct IndexSubmitData {
-    environment: String,
-    custom_target: String,
-    user_id: String,
-    use_environment: bool,
+    login: Option<bool>,
 }
 
 #[derive(Serialize)]
 struct IndexOutputData<'a> {
     #[serde(flatten)]
-    input_data: &'a IndexSubmitData,
+    input_data: &'a IndexInputData,
 
     target: &'a str,
     saml_response: &'a str,
@@ -147,45 +140,146 @@ async fn get_asset(uri: Uri) -> Response {
 
 async fn get_index(
     State(app_context): State<AppContext>,
-    Query(query): Query<IndexInputData>,
-    jar: CookieJar,
-) -> Result<Html<String>, AppError> {
-    let environment = query
-        .environment
-        .as_deref()
-        .unwrap_or_else(|| jar.get("environment").map_or("", |cookie| cookie.value()));
+    Query(mut query): Query<IndexInputData>,
+    mut jar: CookieJar,
+) -> Result<impl IntoResponse, AppError> {
+    let login = query.login.unwrap_or_default();
 
-    let custom_target = query.custom_target.as_deref().unwrap_or_else(|| {
-        jar.get("custom_target").map_or(
-            "http://localhost:8080/combined-app/home/saml.hms",
-            |cookie| cookie.value(),
+    let mut errors = Vec::new();
+    let mut target = "";
+    let mut saml_response = None;
+    let mut relay_state = "";
+
+    let environment_target;
+    let target_url;
+
+    if login {
+        if query.use_environment.unwrap_or(true) {
+            let environment = query.environment.as_deref().unwrap_or_default().trim();
+
+            if environment.is_empty() {
+                target = "";
+                errors.push("'Environment' is required field.");
+            } else {
+                environment_target = format!(
+                    "https://{environment}-ats.mgspdtesting.com/{environment}/home/saml.hms"
+                );
+
+                target = &environment_target;
+            }
+        } else {
+            target = query.custom_target.as_deref().unwrap_or_default().trim();
+
+            if target.is_empty() {
+                errors.push("'Custom Target' is required field.");
+            }
+        }
+
+        relay_state = if !target.is_empty() {
+            target_url = Url::parse(target);
+
+            if let Ok(target_url) = &target_url {
+                target_url
+                    .path_segments()
+                    .map_or("", |mut segments| segments.next().unwrap_or_default())
+            } else {
+                errors.push(if query.use_environment.unwrap_or(true) {
+                    "'Environment' has invalid format."
+                } else {
+                    "'Custom Target' has invalid format."
+                });
+
+                ""
+            }
+        } else {
+            ""
+        };
+
+        let user_id = query.user_id.as_deref().unwrap_or_default().trim();
+
+        if user_id.is_empty() {
+            errors.push("'User ID' is required field.");
+        }
+
+        saml_response = if errors.is_empty() {
+            let saml_response = app_context.handlebars.render(
+                "saml-response",
+                &json!({
+                    "issuer_url": ISSUER_URL,
+                    "timestamp": Utc::now().to_rfc3339(),
+                    "user_id": user_id,
+                }),
+            )?;
+
+            let signed_saml_response = sign(saml_response.as_bytes(), &app_context.key).await?;
+
+            Some(BASE64_STANDARD.encode(signed_saml_response))
+        } else {
+            None
+        };
+    } else {
+        if query.environment.is_none() {
+            let environment = jar.get("environment").map_or("", |cookie| cookie.value());
+            query.environment = Some(environment.to_string());
+        }
+
+        if query.custom_target.is_none() {
+            let custom_target = jar.get("custom_target").map_or(
+                "http://localhost:8080/combined-app/home/saml.hms",
+                |cookie| cookie.value(),
+            );
+
+            query.custom_target = Some(custom_target.to_string());
+        }
+
+        if query.user_id.is_none() {
+            let user_id = jar.get("user_id").map_or("sysdba", |cookie| cookie.value());
+            query.user_id = Some(user_id.to_string());
+        }
+
+        if query.use_environment.is_none() {
+            let use_environment = jar
+                .get("use_environment")
+                .map_or("true", |cookie| cookie.value())
+                == "true";
+
+            query.use_environment = Some(use_environment);
+        }
+    }
+
+    let data = IndexOutputData {
+        input_data: &query,
+        target,
+        saml_response: saml_response.as_deref().unwrap_or_default(),
+        relay_state,
+        errors: &errors,
+    };
+
+    let output = app_context.handlebars.render("index", &data).map(Html)?;
+
+    jar = jar
+        .add(
+            Cookie::build(("environment", query.environment.unwrap_or_default()))
+                .max_age(Duration::WEEK),
         )
-    });
-
-    let user_id = query
-        .user_id
-        .as_deref()
-        .unwrap_or_else(|| jar.get("user_id").map_or("sysdba", |cookie| cookie.value()));
-
-    let use_environment = query.use_environment.unwrap_or_else(|| {
-        jar.get("use_environment")
-            .map_or("true", |cookie| cookie.value())
-            == "true"
-    });
-
-    app_context
-        .handlebars
-        .render(
-            "index",
-            &json!({
-                "environment": environment,
-                "custom_target": custom_target,
-                "user_id": user_id,
-                "use_environment": use_environment
-            }),
+        .add(
+            Cookie::build(("custom_target", query.custom_target.unwrap_or_default()))
+                .max_age(Duration::WEEK),
         )
-        .map(Html)
-        .map_err(Into::into)
+        .add(Cookie::build(("user_id", query.user_id.unwrap_or_default())).max_age(Duration::WEEK))
+        .add(
+            Cookie::build((
+                "use_environment",
+                if query.use_environment.unwrap_or(true) {
+                    "true".to_string()
+                } else {
+                    "false".to_string()
+                },
+            ))
+            .max_age(Duration::WEEK),
+        );
+
+    Ok((jar, output))
 }
 
 async fn sign(data: &[u8], key: impl AsRef<OsStr> + Send) -> Result<Vec<u8>> {
@@ -225,7 +319,7 @@ pub async fn start(host: &str, port: u16, key: OsString) -> Result<()> {
     let app_context = AppContext::new(key)?;
 
     let router = Router::new()
-        .route("/mock-sso/", get(get_index).post(submit))
+        .route("/mock-sso/", get(get_index))
         .fallback(get(get_asset))
         .with_state(app_context)
         .layer(ServiceBuilder::new().layer(CompressionLayer::new()));
@@ -233,104 +327,4 @@ pub async fn start(host: &str, port: u16, key: OsString) -> Result<()> {
     let listener = TcpListener::bind((host, port)).await?;
 
     serve(listener, router).await.map_err(Into::into)
-}
-
-async fn submit(
-    State(app_context): State<AppContext>,
-    jar: CookieJar,
-    Form(form): Form<IndexSubmitData>,
-) -> Result<impl IntoResponse, AppError> {
-    let mut errors = Vec::new();
-
-    let target;
-    let environment_target;
-
-    if form.use_environment {
-        let environment = form.environment.trim();
-
-        if environment.is_empty() {
-            target = "";
-            errors.push("'Environment' is required field.");
-        } else {
-            environment_target =
-                format!("https://{environment}-ats.mgspdtesting.com/{environment}/home/saml.hms");
-
-            target = &environment_target;
-        }
-    } else {
-        target = form.custom_target.trim();
-
-        if target.is_empty() {
-            errors.push("'Custom Target' is required field.");
-        }
-    }
-
-    let target_url = Url::parse(target);
-
-    let relay_state = if let Ok(target_url) = &target_url {
-        target_url
-            .path_segments()
-            .map_or("", |mut segments| segments.next().unwrap_or_default())
-    } else {
-        if !target.is_empty() {
-            errors.push(if form.use_environment {
-                "'Environment' has invalid format."
-            } else {
-                "'Custom Target' has invalid format."
-            });
-        }
-
-        ""
-    };
-
-    let user_id = form.user_id.trim();
-
-    if user_id.is_empty() {
-        errors.push("'User ID' is required field.");
-    }
-
-    let saml_response = if errors.is_empty() {
-        let saml_response = app_context.handlebars.render(
-            "saml-response",
-            &json!({
-                "issuer_url": ISSUER_URL,
-                "timestamp": Utc::now().to_rfc3339(),
-                "user_id": user_id,
-            }),
-        )?;
-
-        let signed_saml_response = sign(saml_response.as_bytes(), &app_context.key).await?;
-
-        Some(BASE64_STANDARD.encode(signed_saml_response))
-    } else {
-        None
-    };
-
-    let data = IndexOutputData {
-        input_data: &form,
-        target,
-        saml_response: saml_response.as_deref().unwrap_or_default(),
-        relay_state,
-        errors: &errors,
-    };
-
-    let output = app_context.handlebars.render("index", &data).map(Html)?;
-
-    let jar = jar
-        .add(Cookie::build(("environment", form.environment)).max_age(Duration::WEEK))
-        .add(Cookie::build(("custom_target", form.custom_target)).max_age(Duration::WEEK))
-        .add(Cookie::build(("user_id", form.user_id)).max_age(Duration::WEEK))
-        .add(
-            Cookie::build((
-                "use_environment",
-                if form.use_environment {
-                    "true".to_string()
-                } else {
-                    "false".to_string()
-                },
-            ))
-            .max_age(Duration::WEEK),
-        );
-
-    Ok((jar, output))
 }
