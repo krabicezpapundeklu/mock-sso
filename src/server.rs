@@ -317,9 +317,9 @@ async fn submit(
     let output = app_context.handlebars.render("index", &data).map(Html)?;
 
     let jar = jar
-        .add(Cookie::build(("environment", form.environment)).max_age(Duration::MAX))
-        .add(Cookie::build(("custom_target", form.custom_target)).max_age(Duration::MAX))
-        .add(Cookie::build(("user_id", form.user_id)).max_age(Duration::MAX))
+        .add(Cookie::build(("environment", form.environment)).max_age(Duration::WEEK))
+        .add(Cookie::build(("custom_target", form.custom_target)).max_age(Duration::WEEK))
+        .add(Cookie::build(("user_id", form.user_id)).max_age(Duration::WEEK))
         .add(
             Cookie::build((
                 "use_environment",
@@ -329,7 +329,7 @@ async fn submit(
                     "false".to_string()
                 },
             ))
-            .max_age(Duration::MAX),
+            .max_age(Duration::WEEK),
         );
 
     Ok((jar, output))
