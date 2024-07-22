@@ -84,6 +84,78 @@ struct IndexInputData {
     login: Option<bool>,
 }
 
+impl IndexInputData {
+    const ENVIRONMENT: &'static str = "environment";
+    const CUSTOM_TARGET: &'static str = "custom_target";
+    const USER_ID: &'static str = "user_id";
+    const USE_ENVIRONMENT: &'static str = "use_environment";
+
+    fn save_to_cookies(self, cookies: CookieJar) -> CookieJar {
+        cookies
+            .add(
+                Cookie::build((Self::ENVIRONMENT, self.environment.unwrap_or_default()))
+                    .max_age(Duration::WEEK),
+            )
+            .add(
+                Cookie::build((Self::CUSTOM_TARGET, self.custom_target.unwrap_or_default()))
+                    .max_age(Duration::WEEK),
+            )
+            .add(
+                Cookie::build((Self::USER_ID, self.user_id.unwrap_or_default()))
+                    .max_age(Duration::WEEK),
+            )
+            .add(
+                Cookie::build((
+                    Self::USE_ENVIRONMENT,
+                    if self.use_environment.unwrap_or(true) {
+                        "true".to_string()
+                    } else {
+                        "false".to_string()
+                    },
+                ))
+                .max_age(Duration::WEEK),
+            )
+    }
+
+    fn use_saved_or_default_values(&mut self, cookies: &CookieJar) {
+        if self.environment.is_none() {
+            let environment = cookies
+                .get(Self::ENVIRONMENT)
+                .map_or("", |cookie| cookie.value());
+
+            self.environment = Some(environment.to_string());
+        }
+
+        if self.custom_target.is_none() {
+            let custom_target = cookies.get(Self::CUSTOM_TARGET).map_or(
+                "http://localhost:8080/combined-app/home/saml.hms",
+                |cookie| cookie.value(),
+            );
+
+            self.custom_target = Some(custom_target.to_string());
+        }
+
+        if self.user_id.is_none() {
+            let user_id = cookies
+                .get(Self::USER_ID)
+                .map_or("sysdba", |cookie| cookie.value());
+
+            self.user_id = Some(user_id.to_string());
+        }
+
+        if self.use_environment.is_none() {
+            let use_environment = cookies
+                .get(Self::USE_ENVIRONMENT)
+                .map_or("true", |cookie| cookie.value())
+                == "true";
+
+            self.use_environment = Some(use_environment);
+        }
+
+        self.login = Some(self.login.unwrap_or_default());
+    }
+}
+
 #[derive(Serialize)]
 struct IndexOutputData<'a> {
     #[serde(flatten)]
@@ -141,7 +213,7 @@ async fn get_asset(uri: Uri) -> Response {
 async fn get_index(
     State(app_context): State<AppContext>,
     Query(mut query): Query<IndexInputData>,
-    mut jar: CookieJar,
+    mut cookies: CookieJar,
 ) -> Result<impl IntoResponse, AppError> {
     let login = query.login.unwrap_or_default();
 
@@ -218,33 +290,7 @@ async fn get_index(
             None
         };
     } else {
-        if query.environment.is_none() {
-            let environment = jar.get("environment").map_or("", |cookie| cookie.value());
-            query.environment = Some(environment.to_string());
-        }
-
-        if query.custom_target.is_none() {
-            let custom_target = jar.get("custom_target").map_or(
-                "http://localhost:8080/combined-app/home/saml.hms",
-                |cookie| cookie.value(),
-            );
-
-            query.custom_target = Some(custom_target.to_string());
-        }
-
-        if query.user_id.is_none() {
-            let user_id = jar.get("user_id").map_or("sysdba", |cookie| cookie.value());
-            query.user_id = Some(user_id.to_string());
-        }
-
-        if query.use_environment.is_none() {
-            let use_environment = jar
-                .get("use_environment")
-                .map_or("true", |cookie| cookie.value())
-                == "true";
-
-            query.use_environment = Some(use_environment);
-        }
+        query.use_saved_or_default_values(&cookies);
     }
 
     let data = IndexOutputData {
@@ -255,31 +301,11 @@ async fn get_index(
         errors: &errors,
     };
 
-    let output = app_context.handlebars.render("index", &data).map(Html)?;
+    let output = Html(app_context.handlebars.render("index", &data)?);
 
-    jar = jar
-        .add(
-            Cookie::build(("environment", query.environment.unwrap_or_default()))
-                .max_age(Duration::WEEK),
-        )
-        .add(
-            Cookie::build(("custom_target", query.custom_target.unwrap_or_default()))
-                .max_age(Duration::WEEK),
-        )
-        .add(Cookie::build(("user_id", query.user_id.unwrap_or_default())).max_age(Duration::WEEK))
-        .add(
-            Cookie::build((
-                "use_environment",
-                if query.use_environment.unwrap_or(true) {
-                    "true".to_string()
-                } else {
-                    "false".to_string()
-                },
-            ))
-            .max_age(Duration::WEEK),
-        );
+    cookies = query.save_to_cookies(cookies);
 
-    Ok((jar, output))
+    Ok((cookies, output))
 }
 
 async fn sign(data: &[u8], key: impl AsRef<OsStr> + Send) -> Result<Vec<u8>> {
