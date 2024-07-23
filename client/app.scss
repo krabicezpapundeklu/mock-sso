@@ -54,6 +54,10 @@ $primary: $purple !default;
   color: white;
 }
 
+.alert-link {
+  color: var(--bs-alert-link-color) !important
+}
+
 .alert-warning {
   background-color: #ebc144;
   border: 0;
@@ -72,4 +76,8 @@ $primary: $purple !default;
   --bs-navbar-brand-hover-color: white;
   --bs-navbar-color: white;
   background-color: $purple;
+}
+
+ul {
+  list-style: none;
 }
