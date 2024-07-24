@@ -1,6 +1,7 @@
 use std::{
     ffi::{OsStr, OsString},
     process::Stdio,
+    str::FromStr,
 };
 
 use anyhow::{bail, Context, Error, Result};
@@ -75,6 +76,40 @@ impl IntoResponse for AppError {
     }
 }
 
+trait Cookies {
+    fn add_cookie(self, name: &'static str, value: Option<String>) -> Self;
+
+    fn fill_option_if_none<T: FromStr>(
+        &self,
+        option: &mut Option<T>,
+        name: &str,
+        default_value: &str,
+    ) -> Result<(), T::Err>;
+}
+
+impl Cookies for CookieJar {
+    fn add_cookie(self, name: &'static str, value: Option<String>) -> Self {
+        self.add(Cookie::build((name, value.unwrap_or_default())).max_age(Duration::WEEK))
+    }
+
+    fn fill_option_if_none<T: FromStr>(
+        &self,
+        option: &mut Option<T>,
+        name: &str,
+        default_value: &str,
+    ) -> Result<(), T::Err> {
+        if option.is_none() {
+            let value = self
+                .get(name)
+                .map_or(default_value, |cookie| cookie.value());
+
+            (*option).replace(T::from_str(value)?);
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 struct IndexInputData {
     environment: Option<String>,
@@ -92,67 +127,30 @@ impl IndexInputData {
 
     fn save_to_cookies(self, cookies: CookieJar) -> CookieJar {
         cookies
-            .add(
-                Cookie::build((Self::ENVIRONMENT, self.environment.unwrap_or_default()))
-                    .max_age(Duration::WEEK),
-            )
-            .add(
-                Cookie::build((Self::CUSTOM_TARGET, self.custom_target.unwrap_or_default()))
-                    .max_age(Duration::WEEK),
-            )
-            .add(
-                Cookie::build((Self::USER_ID, self.user_id.unwrap_or_default()))
-                    .max_age(Duration::WEEK),
-            )
-            .add(
-                Cookie::build((
-                    Self::USE_ENVIRONMENT,
-                    if self.use_environment.unwrap_or(true) {
-                        "true".to_string()
-                    } else {
-                        "false".to_string()
-                    },
-                ))
-                .max_age(Duration::WEEK),
+            .add_cookie(Self::ENVIRONMENT, self.environment)
+            .add_cookie(Self::CUSTOM_TARGET, self.custom_target)
+            .add_cookie(Self::USER_ID, self.user_id)
+            .add_cookie(
+                Self::USE_ENVIRONMENT,
+                Some(self.use_environment.unwrap_or(true).to_string()),
             )
     }
 
-    fn use_saved_or_default_values(&mut self, cookies: &CookieJar) {
-        if self.environment.is_none() {
-            let environment = cookies
-                .get(Self::ENVIRONMENT)
-                .map_or("", |cookie| cookie.value());
+    fn use_saved_or_default_values(&mut self, cookies: &CookieJar) -> Result<()> {
+        cookies.fill_option_if_none(&mut self.environment, Self::ENVIRONMENT, "")?;
 
-            self.environment = Some(environment.to_string());
-        }
+        cookies.fill_option_if_none(
+            &mut self.custom_target,
+            Self::CUSTOM_TARGET,
+            "http://localhost:8080/combined-app/home/saml.hms",
+        )?;
 
-        if self.custom_target.is_none() {
-            let custom_target = cookies.get(Self::CUSTOM_TARGET).map_or(
-                "http://localhost:8080/combined-app/home/saml.hms",
-                |cookie| cookie.value(),
-            );
-
-            self.custom_target = Some(custom_target.to_string());
-        }
-
-        if self.user_id.is_none() {
-            let user_id = cookies
-                .get(Self::USER_ID)
-                .map_or("sysdba", |cookie| cookie.value());
-
-            self.user_id = Some(user_id.to_string());
-        }
-
-        if self.use_environment.is_none() {
-            let use_environment = cookies
-                .get(Self::USE_ENVIRONMENT)
-                .map_or("true", |cookie| cookie.value())
-                == "true";
-
-            self.use_environment = Some(use_environment);
-        }
+        cookies.fill_option_if_none(&mut self.user_id, Self::USER_ID, "sysdba")?;
+        cookies.fill_option_if_none(&mut self.use_environment, Self::USE_ENVIRONMENT, "true")?;
 
         self.login = Some(self.login.unwrap_or_default());
+
+        Ok(())
     }
 }
 
@@ -290,7 +288,7 @@ async fn get_index(
             None
         };
     } else {
-        query.use_saved_or_default_values(&cookies);
+        query.use_saved_or_default_values(&cookies)?;
     }
 
     let data = IndexOutputData {
