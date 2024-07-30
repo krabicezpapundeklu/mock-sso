@@ -21,6 +21,7 @@ use axum::{
 use axum_extra::extract::{cookie::Cookie, CookieJar};
 use base64::{prelude::BASE64_STANDARD, Engine};
 use chrono::Utc;
+use const_format::concatcp;
 use cookie::time::Duration;
 use handlebars::Handlebars;
 use rust_embed::RustEmbed;
@@ -31,6 +32,7 @@ use tower::ServiceBuilder;
 use tower_http::compression::CompressionLayer;
 use url::Url;
 
+const BASE: &str = "/mock-sso";
 const ISSUER_URL: &str = "https://mock-sso.mgspdtesting.com";
 
 #[derive(Clone)]
@@ -72,26 +74,22 @@ where
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        (StatusCode::INTERNAL_SERVER_ERROR, format!("{}", self.0)).into_response()
+        (StatusCode::INTERNAL_SERVER_ERROR, self.0.to_string()).into_response()
     }
 }
 
 trait Cookies {
-    fn add_cookie(self, name: &'static str, value: Option<String>) -> Self;
-
     fn fill_option_if_none<T: FromStr>(
         &self,
         option: &mut Option<T>,
         name: &str,
         default_value: &str,
     ) -> Result<(), T::Err>;
+
+    fn set_cookie<T: ToString>(self, name: &'static str, value: Option<T>) -> Self;
 }
 
 impl Cookies for CookieJar {
-    fn add_cookie(self, name: &'static str, value: Option<String>) -> Self {
-        self.add(Cookie::build((name, value.unwrap_or_default())).max_age(Duration::WEEK))
-    }
-
     fn fill_option_if_none<T: FromStr>(
         &self,
         option: &mut Option<T>,
@@ -107,6 +105,14 @@ impl Cookies for CookieJar {
         }
 
         Ok(())
+    }
+
+    fn set_cookie<T: ToString>(self, name: &'static str, value: Option<T>) -> Self {
+        if let Some(value) = value {
+            self.add(Cookie::build((name, value.to_string())).max_age(Duration::WEEK))
+        } else {
+            self.remove(Cookie::from(name))
+        }
     }
 }
 
@@ -127,13 +133,10 @@ impl IndexInputData {
 
     fn save_to_cookies(self, cookies: CookieJar) -> CookieJar {
         cookies
-            .add_cookie(Self::ENVIRONMENT, self.environment)
-            .add_cookie(Self::CUSTOM_TARGET, self.custom_target)
-            .add_cookie(Self::USER_ID, self.user_id)
-            .add_cookie(
-                Self::USE_ENVIRONMENT,
-                Some(self.use_environment.unwrap_or(true).to_string()),
-            )
+            .set_cookie(Self::ENVIRONMENT, self.environment)
+            .set_cookie(Self::CUSTOM_TARGET, self.custom_target)
+            .set_cookie(Self::USER_ID, self.user_id)
+            .set_cookie(Self::USE_ENVIRONMENT, self.use_environment)
     }
 
     fn use_saved_or_default_values(&mut self, cookies: &CookieJar) -> Result<()> {
@@ -166,6 +169,21 @@ struct IndexOutputData<'a> {
     errors: &'a Vec<&'a str>,
 }
 
+async fn generate_saml_response(app_context: &AppContext, user_id: &str) -> Result<String> {
+    let saml_response = app_context.handlebars.render(
+        "saml-response",
+        &json!({
+            "issuer_url": ISSUER_URL,
+            "timestamp": Utc::now().to_rfc3339(),
+            "user_id": user_id,
+        }),
+    )?;
+
+    let signed_saml_response = sign(saml_response.as_bytes(), &app_context.key).await?;
+
+    Ok(BASE64_STANDARD.encode(signed_saml_response))
+}
+
 async fn get_asset(uri: Uri) -> Response {
     #[derive(RustEmbed)]
     #[folder = "dist"]
@@ -180,9 +198,9 @@ async fn get_asset(uri: Uri) -> Response {
 
     let path = uri.path();
 
-    if !path.starts_with("/mock-sso/") {
+    if !path.starts_with(concatcp!(BASE, '/')) {
         return Redirect::permanent(&format!(
-            "/mock-sso{}",
+            "{BASE}{}",
             uri.path_and_query()
                 .map(PathAndQuery::as_str)
                 .unwrap_or_default()
@@ -190,7 +208,7 @@ async fn get_asset(uri: Uri) -> Response {
         .into_response();
     }
 
-    let path = uri.path().trim_start_matches("/mock-sso/");
+    let path = path.trim_start_matches(concatcp!(BASE, '/'));
 
     if let Some(asset) = Dist::get(path) {
         (
@@ -245,24 +263,20 @@ async fn get_index(
             }
         }
 
-        relay_state = if !target.is_empty() {
+        if !target.is_empty() {
             target_url = Url::parse(target);
 
             if let Ok(target_url) = &target_url {
-                target_url
+                relay_state = target_url
                     .path_segments()
-                    .map_or("", |mut segments| segments.next().unwrap_or_default())
+                    .map_or("", |mut segments| segments.next().unwrap_or_default());
             } else {
                 errors.push(if query.use_environment.unwrap_or(true) {
                     "'Environment' has invalid format."
                 } else {
                     "'Custom Target' has invalid format."
                 });
-
-                ""
             }
-        } else {
-            ""
         };
 
         let user_id = query.user_id.as_deref().unwrap_or_default().trim();
@@ -271,22 +285,9 @@ async fn get_index(
             errors.push("'User ID' is required field.");
         }
 
-        saml_response = if errors.is_empty() {
-            let saml_response = app_context.handlebars.render(
-                "saml-response",
-                &json!({
-                    "issuer_url": ISSUER_URL,
-                    "timestamp": Utc::now().to_rfc3339(),
-                    "user_id": user_id,
-                }),
-            )?;
-
-            let signed_saml_response = sign(saml_response.as_bytes(), &app_context.key).await?;
-
-            Some(BASE64_STANDARD.encode(signed_saml_response))
-        } else {
-            None
-        };
+        if errors.is_empty() {
+            saml_response = Some(generate_saml_response(&app_context, user_id).await?);
+        }
     } else {
         query.use_saved_or_default_values(&cookies)?;
     }
@@ -343,7 +344,7 @@ pub async fn start(host: &str, port: u16, key: OsString) -> Result<()> {
     let app_context = AppContext::new(key)?;
 
     let router = Router::new()
-        .route("/mock-sso/", get(get_index))
+        .route(concatcp!(BASE, '/'), get(get_index))
         .fallback(get(get_asset))
         .with_state(app_context)
         .layer(ServiceBuilder::new().layer(CompressionLayer::new()));

@@ -1,6 +1,6 @@
 [package]
 name = "mock-sso"
-version = "0.9.2"
+version = "0.9.3"
 edition = "2021"
 
 [dependencies]
@@ -10,6 +10,7 @@ axum-extra = { version = "0", features = ["cookie"] }
 base64 = "0"
 chrono = "0"
 clap = { version = "4", features = ["derive"] }
+const_format = "0"
 cookie = "0"
 handlebars = { version = "5", features = ["rust-embed"] }
 rust-embed = { version = "8", features = ["mime-guess"] }
