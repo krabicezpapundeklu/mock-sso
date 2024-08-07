@@ -9,6 +9,10 @@ document.querySelectorAll('[data-use-environment]').forEach((e) => {
         inputToDeactivate.classList.add('inactive');
     }
 
+    inputToActivate.addEventListener('focus', () => {
+        radio.click();
+    });
+
     radio.addEventListener('click', () => {
         inputToActivate.classList.remove('inactive');
         inputToDeactivate.classList.add('inactive');
