@@ -241,6 +241,10 @@ async fn get_index(
     let environment_target;
     let target_url;
 
+    if let Some(environment) = query.environment {
+        query.environment = Some(environment.to_lowercase());
+    }
+
     if login {
         if query.use_environment.unwrap_or(true) {
             let environment = query.environment.as_deref().unwrap_or_default().trim();
