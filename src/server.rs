@@ -4,22 +4,23 @@ use std::{
     str::FromStr,
 };
 
-use anyhow::{bail, Context, Error, Result};
+use anyhow::{Context, Error, Result, bail};
 
 use axum::{
+    Router,
     extract::{Query, State},
     http::{
+        StatusCode, Uri,
         header::{CACHE_CONTROL, CONTENT_TYPE},
         uri::PathAndQuery,
-        StatusCode, Uri,
     },
     response::{Html, IntoResponse, Redirect, Response},
     routing::get,
-    serve, Router,
+    serve,
 };
 
-use axum_extra::extract::{cookie::Cookie, CookieJar};
-use base64::{prelude::BASE64_STANDARD, Engine};
+use axum_extra::extract::{CookieJar, cookie::Cookie};
+use base64::{Engine, prelude::BASE64_STANDARD};
 use chrono::Utc;
 use const_format::concatcp;
 use cookie::time::Duration;
@@ -108,10 +109,11 @@ impl Cookies for CookieJar {
     }
 
     fn set_cookie<T: ToString>(self, name: &'static str, value: Option<T>) -> Self {
-        if let Some(value) = value {
-            self.add(Cookie::build((name, value.to_string())).max_age(Duration::WEEK))
-        } else {
-            self.remove(Cookie::from(name))
+        match value {
+            Some(value) => {
+                self.add(Cookie::build((name, value.to_string())).max_age(Duration::WEEK))
+            }
+            _ => self.remove(Cookie::from(name)),
         }
     }
 }
